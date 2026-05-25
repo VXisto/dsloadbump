@@ -21,6 +21,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <math.h>
 
 
 /* ==========================================================================
@@ -765,19 +766,30 @@ int romm_download_rom(const RommConfig *cfg, int rom_id,
 
 #define PBAR_W 15   /* bar fill characters; total line ≤ 32 cols */
 
+int get_percentage(int done, int total_bytes) {
+	if (total_bytes >= 0x100000) {
+		int scaled_done = ceil(done/1024);
+		int scaled_total = ceil(total_bytes/1024);
+		return ceil(((unsigned long)scaled_done*100) / scaled_total);
+	}
+
+	return ceil(((unsigned long)done*100) / total_bytes);
+}
+
 static void draw_progress(int done, int total_bytes) {
 	char bar[PBAR_W + 1];
 	memset(bar, ' ', PBAR_W);
 	bar[PBAR_W] = '\0';
 
-	char size[12];
+	char size[12]; 
 
 	if (total_bytes > 0) {
-		int pct  = (int)((long)done * 100 / total_bytes);
-		int fill = (int)((long)pct * PBAR_W / 100);
+		int pct  = get_percentage(done, total_bytes);
+		int fill = ceil(((unsigned long)pct * PBAR_W)/100);
 		for (int i = 0; i < fill; i++) bar[i] = '#';
 
-		if (total_bytes >= 1024 * 1024)
+		/* 0x100000 = 1024*1024*/
+		if (total_bytes >= 0x100000)
 			snprintf(size, sizeof(size), "%d/%dMB",
 			         done >> 20, total_bytes >> 20);
 		else
@@ -792,7 +804,7 @@ static void draw_progress(int done, int total_bytes) {
 		for (int i = 0; i < PBAR_W; i++)
 			bar[i] = (i >= p && i < p + 3) ? '>' : ' ';
 
-		if (done >= 1024 * 1024)
+		if (done >= 0x100000)
 			snprintf(size, sizeof(size), "%dMB   ", done >> 20);
 		else
 			snprintf(size, sizeof(size), "%dKB   ", done >> 10);
@@ -800,7 +812,6 @@ static void draw_progress(int done, int total_bytes) {
 		printf("\r[%s]  ?? %-9s", bar, size);
 	}
 }
-
 
 /* ==========================================================================
  * ZIP / platform helpers
